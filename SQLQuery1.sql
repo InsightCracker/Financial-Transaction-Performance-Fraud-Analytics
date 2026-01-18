@@ -1,6 +1,7 @@
 SELECT * 
 FROM [bank transaction_data];
 
+
 -- KPIs
 -- Total Transaction
 SELECT 
@@ -19,53 +20,86 @@ FROM [bank transaction_data]
 
 -- Transaction Success Rate(%)
 SELECT 
-    COUNT (*) * 100.0 / (SELECT 
+    SUM(CASE 
+        WHEN transaction_status = 'success'  THEN 1 
+        ELSE 0 
+    END) * CAST(100.0 AS FLOAT) / (SELECT 
         COUNT(*) 
         FROM [bank transaction_data]) 
     AS success_rate
-FROM [bank transaction_data]
-WHERE Transaction_Status = 'success';
+FROM [bank transaction_data];
 
 -- Fraud Analysis
 -- Fraud Rate (%)
 SELECT 
-    COUNT (*) * 100.0 / (SELECT 
+    SUM(CASE 
+        WHEN fraud_flag = 1 THEN 1 
+        ELSE 0 
+    END ) * CAST(100.0 AS FLOAT) / (SELECT 
         COUNT (*) 
         FROM [bank transaction_data])
     AS total_fraud_rate
 FROM [bank transaction_data]
-WHERE Fraud_Flag = 1;
 
 -- Fraud Rate by Transaction Type
+-- Fraud Rate by Transaction Type in a table
+SELECT 
+    transaction_type,
+    SUM(transaction_amount) AS transaction_value,
+    SUM(CASE
+            WHEN fraud_flag = 1 THEN 1 
+            ELSE 0 
+        END) * CAST(100.0 AS FLOAT) / (SELECT 
+            COUNT (*) 
+        FROM [bank transaction_data]) AS fraud_rate
+FROM [bank transaction_data]
+GROUP BY Transaction_Type;
+
 -- Transfer
 SELECT 
-    COUNT (*) * 100.0 / (SELECT 
+    SUM(CASE 
+        WHEN fraud_flag = 1 AND Transaction_Type = 'transfer'  THEN 1 
+        ELSE 0 
+    END ) * CAST(100.0 AS FLOAT) / (SELECT 
         COUNT (*) 
         FROM [bank transaction_data])
     AS fraud_rate_by_transfer
-FROM [bank transaction_data]
-WHERE Fraud_Flag = 1
-AND Transaction_Type = 'transfer';
+FROM [bank transaction_data];
 
 -- Withdrawal
 SELECT 
-    COUNT (*) * 100.0 / (SELECT 
+    SUM(CASE 
+        WHEN fraud_flag = 1 AND Transaction_Type = 'withdrawal'  THEN 1 
+        ELSE 0 
+    END ) * CAST(100.0 AS FLOAT) / (SELECT 
         COUNT (*) 
         FROM [bank transaction_data])
     AS fraud_rate_bt_withdrawal
-FROM [bank transaction_data]
-WHERE Fraud_Flag = 1
-AND Transaction_Type = 'withdrawal';
+FROM [bank transaction_data];
 
 -- Deposit
 SELECT 
-    COUNT (*) * 100.0 / (SELECT 
+    SUM(CASE 
+        WHEN fraud_flag = 1 AND Transaction_Type = 'deposit'  THEN 1 
+        ELSE 0 
+    END ) * CAST(100.0 AS FLOAT) / (SELECT 
         COUNT (*) 
         FROM [bank transaction_data])
     AS fraud_rate_by_deposit
+FROM [bank transaction_data];
+
+-- Fraud trend over time
+SELECT
+    DATEPART(HOUR, Timestamp) AS transaction_hour,
+    COUNT(*) AS total_transactions,
+    SUM(CASE 
+        WHEN Fraud_Flag = 1 
+        THEN 1 
+        ELSE 0 
+    END) AS fraud_transactions
 FROM [bank transaction_data]
-WHERE Fraud_Flag = 1
-AND Transaction_Type = 'deposit';
+GROUP BY DATEPART(HOUR, Timestamp)
+ORDER BY transaction_hour;
 
 
 -- NETWORK PERFORMANCE 
@@ -85,7 +119,7 @@ SELECT
 FROM [bank transaction_data]
 GROUP BY Transaction_Status;
 
-
+--Latency Bucket
 SELECT
     CASE
         WHEN Latency_ms BETWEEN 0 AND 5 THEN '0–5 ms'
@@ -109,31 +143,67 @@ FROM [bank transaction_data]
 GROUP BY Device_Used;
 
 -- Failure rate by device (%)
--- Mobile
+-- Percentage of the total failed transactions by Mobile
 SELECT 
-    COUNT (*) * 100.0 / (SELECT 
-        COUNT (*)
+    SUM(CASE 
+            WHEN transaction_status = 'failed' AND device_used = 'mobile' 
+            THEN 1 ELSE 0 
+        END) * CAST(100.0 AS FLOAT) / (SELECT 
+        SUM(CASE 
+                WHEN transaction_status = 'failed' 
+                THEN 1 
+                ELSE 0 
+            END)
         FROM [bank transaction_data]) AS failure_rate_by_mobile
-FROM [bank transaction_data] 
-WHERE  Transaction_Status = 'failed'
-AND Device_Used = 'mobile';
+FROM [bank transaction_data];
 
--- Desktop
+
+-- Percentage of the total failed transactions by Desktop
 SELECT 
-    COUNT (*) * 100.0 / (SELECT 
-        COUNT (*)
-        FROM [bank transaction_data]) AS failure_rate_by_desktop
-FROM [bank transaction_data] 
-WHERE  Transaction_Status = 'failed'
-AND Device_Used = 'desktop';
+    SUM(CASE 
+            WHEN transaction_status = 'failed' AND device_used = 'desktop' 
+            THEN 1 ELSE 0 
+        END) * CAST(100.0 AS FLOAT) / (SELECT 
+        SUM(CASE 
+                WHEN transaction_status = 'failed' 
+                THEN 1 
+                ELSE 0 
+            END)
+        FROM [bank transaction_data]) AS failure_rate_by_mobile
+FROM [bank transaction_data];
 
 -- Failure rate by device (%) in a table
+-- Last Column indicate percentage of the total transactions that failed
 SELECT 
     Device_Used,
-    COUNT (*) AS total_transaction,
+    COUNT (*) AS total_transactions,
     SUM (CASE 
-        WHEN transaction_status = 'failed' THEN 1 ELSE 0 END) AS failed_transaction,
-    SUM (CASE 
-        WHEN transaction_status = 'failed' THEN 1 ELSE 0 END) * 100.0 / COUNT (*) AS failure_rate_percent
+            WHEN transaction_status = 'failed' 
+            THEN 1 
+            ELSE 0 
+        END) AS failed_transactions,
+    ROUND(SUM (CASE 
+            WHEN transaction_status = 'failed' 
+            THEN 1 
+            ELSE 0 
+        END) * CAST(100.0 AS FLOAT) / COUNT (*), 2) AS failure_rate_percent
 FROM [bank transaction_data]
 GROUP BY device_used;
+
+-- Top 10 Senders
+SELECT TOP 10
+    Sender_Account_ID, 
+    SUM(CAST(transaction_amount AS FLOAT)) AS total_transactions
+FROM [bank transaction_data]
+GROUP BY Sender_Account_ID
+ORDER BY total_transactions desc
+
+
+-- Top 5 Receivers
+SELECT TOP 5
+    Receiver_Account_ID, 
+    SUM(CAST(transaction_amount AS FLOAT)) AS total_transactions
+FROM [bank transaction_data]
+GROUP BY Receiver_Account_ID
+ORDER BY total_transactions desc
+
