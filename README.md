@@ -46,7 +46,7 @@ Descriptive analytics using KPIs (transaction count, value, success rate, fraud 
 Comparative analysis by:
 * Transaction type
 * Device (mobile vs desktop)
-*Network slice
+* Network slice
 
 Trend analysis to observe fraud behavior over time.
 
