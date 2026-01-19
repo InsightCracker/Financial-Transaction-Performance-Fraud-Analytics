@@ -1,4 +1,4 @@
-![alt text](<Screenshot 2026-01-18 165035-1.png>)
+![alt text](<Screenshot 2026-01-18 165035.png>)
 # FINANCIAL TRANSACTION PERFORMANCE ANALYTICS 
 
 ## 📊 Executive Summary
